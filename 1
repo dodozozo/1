@@ -28,56 +28,29 @@ if (not localPlayer) then
     localPlayer = players.LocalPlayer
 end
 
--- Улучшенная функция безопасного доступа к элементам интерфейса
-local function safeFindGuiElement(path)
-    local current = game
-    for _, part in ipairs(path) do
-        if current and current:FindFirstChild(part) then
-            current = current[part]
-        else
-            return nil
-        end
-    end
-    return current
-end
-
--- Исправленная функция для ChatChannels
+-- Упрощенная функция для ChatChannels без обращения к Name
 local function getChatChannels()
-    if not localPlayer or not localPlayer.Name then
-        return Instance.new("Frame")
-    end
+    -- Просто создаем заглушку без сложных проверок
+    local fakeChannels = Instance.new("Frame")
+    fakeChannels.Name = "ChatChannels"
+    fakeChannels.Visible = false
     
-    local chatPath = {"Players", localPlayer.Name, "PlayerGui", "GameUI", "Chat"}
-    local chat = safeFindGuiElement(chatPath)
-    
-    if chat and chat:FindFirstChild("ChatChannels") then
-        return chat.ChatChannels
-    else
-        -- Создаем заглушку если ChatChannels отсутствует
-        local fakeChannels = Instance.new("Frame")
-        fakeChannels.Name = "ChatChannels"
-        fakeChannels.Visible = false
-        
-        if chat then
-            fakeChannels.Parent = chat
-        else
-            -- Если чат не найден, создаем минимальную структуру
-            local playerGui = safeFindGuiElement({"Players", localPlayer.Name, "PlayerGui"})
-            if playerGui then
-                local gameUI = playerGui:FindFirstChild("GameUI") or Instance.new("ScreenGui")
-                gameUI.Name = "GameUI"
-                gameUI.Parent = playerGui
-                
-                local chatFrame = Instance.new("Frame")
-                chatFrame.Name = "Chat"
-                chatFrame.Parent = gameUI
-                
-                fakeChannels.Parent = chatFrame
+    -- Пытаемся найти реальный чат, но не полагаемся на него
+    pcall(function()
+        local playerGui = players.LocalPlayer:FindFirstChild("PlayerGui")
+        if playerGui then
+            local gameUI = playerGui:FindFirstChild("GameUI")
+            if gameUI then
+                local chat = gameUI:FindFirstChild("Chat")
+                if chat then
+                    fakeChannels.Parent = chat
+                    return
+                end
             end
         end
-        
-        return fakeChannels
-    end
+    end)
+    
+    return fakeChannels
 end
 
 -- Инициализируем после полной загрузки localPlayer
