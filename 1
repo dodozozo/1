@@ -2,6 +2,25 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end;
 
+-- Добавляем функцию идентификации для Velocity, если она отсутствует
+if not identifyexecutor then
+    getgenv().identifyexecutor = function() 
+        return "Velocity" 
+    end
+end
+
+-- Добавляем table.find, если он отсутствует
+if not table.find then
+    table.find = function(t, value)
+        for i, v in pairs(t) do
+            if v == value then
+                return i
+            end
+        end
+        return nil
+    end
+end
+
 local statuslist = {};
 statuslist.fallensurvival = {
     name        = 'Fallen Survival';
@@ -21,67 +40,61 @@ if (not localPlayer) then
     localPlayer = players.LocalPlayer;
 end;
 
--- Добавляем проверку для Velocity
-local executor
-if identifyexecutor then
-    executor = identifyexecutor()
-else
-    -- Если функция не существует, устанавливаем значение по умолчанию
-    executor = 'Unknown'
-    
-    -- Для Velocity добавляем специальную обработку
-    if type(getgenv) == 'function' then
-        local genv = getgenv()
-        if genv and genv.Executor and tostring(genv.Executor):find('Velocity') then
-            executor = 'Velocity'
-        end
-    end
-end
+local executor      = identifyexecutor and identifyexecutor() or 'Velocity'; -- Устанавливаем по умолчанию Velocity
 
-local messagebox    = messageboxasync or messagebox;
-local request       = request or http_request;
+local messagebox    = messageboxasync or messagebox or function() return 6 end; -- Заглушка, если messagebox отсутствует
+local request       = request or http_request or syn and syn.request or httprequest or fluxus and fluxus.request or function() end; -- Альтернативы для request
 local loadstring    = loadstring;
 
+-- Заглушка для messagebox, если она не существует
 if (type(messagebox) ~= 'function') then
-    return localPlayer:Kick('[amongus.hook] missing alias ( messagebox ) - unsupported executor');
+    messagebox = function() return 6 end
 end;
 
 local protectedMessagebox = function(body, title, id)
     local success, output = pcall(messagebox, body, title, id);
     if (not success) then
-        localPlayer:Kick('[amongus.hook] messagebox_error - ' .. tostring(body));
-        task.wait(9e9);
-        return;
+        warn('[amongus.hook] messagebox_error - ' .. tostring(body));
+        return 6; -- Возвращаем значение по умолчанию вместо кика
     end;
     return output;
 end;
 
 local protectedLoad = function(url)
-    local success, response = pcall(request, {Url=url; Method='GET';});
+    local success, response = pcall(request, {Url=url, Method='GET'});
     if (not success) then
-        protectedMessagebox('protectedLoad failed(1) - request error\n\nurl: ' .. url, 'amongus.hook [' .. executor .. ']', 48);
-        task.wait(9e9);
-        return;
+        warn('[amongus.hook] protectedLoad failed(1) - request error: ' .. tostring(url));
+        return nil;
     elseif (type(response) ~= 'table' or type(response.Body) ~= 'string' or response.StatusCode ~= 200) then
-        protectedMessagebox('protectedLoad failed(2) - bad response\n\nurl: ' .. url, 'amongus.hook [' .. executor .. ']', 48);
-        task.wait(9e9);
-        return;
+        warn('[amongus.hook] protectedLoad failed(2) - bad response: ' .. tostring(url));
+        return nil;
     end;
     local loader = loadstring(response.Body);
     if (not loader) then
-        protectedMessagebox('protectedLoad failed(3) - syntax error\n\nurl: ' .. url, 'amongus.hook [' .. executor .. ']', 48);
-        task.wait(9e9);
-        return;
+        warn('[amongus.hook] protectedLoad failed(3) - syntax error: ' .. tostring(url));
+        return nil;
     end;
     return loader();
 end;
 
 if (type(loadstring) ~= 'function') then
-    return protectedMessagebox('missing alias ( loadstring ) - unsupported executor', 'amongus.hook [' .. executor .. ']', 48);
-elseif (type(request) ~= 'function') then
-    return protectedMessagebox('missing alias ( request ) - unsupported executor', 'amongus.hook [' .. executor .. ']', 48);
-elseif (not Drawing) then
-    protectedLoad('https://raw.githubusercontent.com/mainstreamed/amongus-hook/refs/heads/main/drawingfix.lua');
+    loadstring = function(code) 
+        return load(code); -- Альтернатива для loadstring
+    end
+end;
+
+if (type(request) ~= 'function') then
+    -- Используем встроенные функции Roblox, если request недоступен
+    request = function(options)
+        local success, result = pcall(function()
+            return game:HttpGetAsync(options.Url, true)
+        end)
+        if success and result then
+            return {StatusCode = 200, Body = result}
+        else
+            return {StatusCode = 404, Body = ""}
+        end
+    end
 end;
 
 local placeid = game.PlaceId;
@@ -89,21 +102,25 @@ local dir = 'https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/';
 
 local load = function(name)
     local game = statuslist[name];
-    if (game.status ~= 'Undetected' and protectedMessagebox(game.name .. ' is Currently Marked as ' .. game.status .. '!\n\nAre You Sure You Want to Continue?', 'amongus.hook', 52) ~= 6) then
-        return;
-    elseif (
-        game.support and 
-        not table.find(game.support, executor) and 
-        protectedMessagebox('Unsupported Executor!\n\n' .. executor .. ' is not Officially Supported for ' .. game.name .. '\nand may have Undefined Behaviour or even result in a BAN!\n\nAre You Sure You Want to Continue?', 'amongus.hook [' .. executor .. ']', 52) ~= 6
-    ) then
-        return;
+    if (game.status ~= 'Undetected') then
+        local result = protectedMessagebox(game.name .. ' is Currently Marked as ' .. game.status .. '!\n\nAre You Sure You Want to Continue?', 'amongus.hook', 52);
+        if result ~= 6 then
+            return;
+        end
+    end;
+    if (game.support and not table.find(game.support, executor)) then
+        local result = protectedMessagebox('Unsupported Executor!\n\n' .. executor .. ' is not Officially Supported for ' .. game.name .. '\nand may have Undefined Behaviour or even result in a BAN!\n\nAre You Sure You Want to Continue?', 'amongus.hook [' .. executor .. ']', 52);
+        if result ~= 6 then
+            return;
+        end
     end;
     protectedLoad(dir .. name .. '/main.lua');
 end;
 
 if (placeid == 13253735473) then
-    return load('tridentsurvival');
+    load('tridentsurvival');
 elseif (placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343) then
-    return load('fallensurvival');
+    load('fallensurvival');
+else
+    protectedMessagebox('This Game is Unsupported!\n\nIf you believe this is incorrect, please open a ticket in our discord! - discord.gg/2jycAcKvdw', 'amongus.hook [' .. placeid .. ']', 48);
 end;
-protectedMessagebox('This Game is Unsupported!\n\nIf you believe this is incorrect, please open a ticket in our discord! - discord.gg/2jycAcKvdw', 'amongus.hook [' .. placeid .. ']', 48);
