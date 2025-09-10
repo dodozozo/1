@@ -21,16 +21,64 @@ if not table.find then
     end
 end
 
+-- Функция безопасного доступа к элементам интерфейса
+local function safeFindGuiElement(path)
+    local current = game
+    for _, part in ipairs(path) do
+        if current:FindFirstChild(part) then
+            current = current[part]
+        else
+            return nil
+        end
+    end
+    return current
+end
+
+-- Заглушка для ChatChannels
+local function getChatChannels()
+    local chatPath = {"Players", localPlayer.Name, "PlayerGui", "GameUI", "Chat"}
+    local chat = safeFindGuiElement(chatPath)
+    
+    if chat and chat:FindFirstChild("ChatChannels") then
+        return chat.ChatChannels
+    else
+        -- Создаем заглушку если ChatChannels отсутствует
+        local fakeChannels = Instance.new("Frame")
+        fakeChannels.Name = "ChatChannels"
+        fakeChannels.Visible = false
+        
+        if chat then
+            fakeChannels.Parent = chat
+        else
+            -- Если чат не найден, создаем минимальную структуру
+            local playerGui = safeFindGuiElement({"Players", localPlayer.Name, "PlayerGui"})
+            if playerGui then
+                local gameUI = playerGui:FindFirstChild("GameUI") or Instance.new("ScreenGui")
+                gameUI.Name = "GameUI"
+                gameUI.Parent = playerGui
+                
+                local chatFrame = Instance.new("Frame")
+                chatFrame.Name = "Chat"
+                chatFrame.Parent = gameUI
+                
+                fakeChannels.Parent = chatFrame
+            end
+        end
+        
+        return fakeChannels
+    end
+end
+
 local statuslist = {};
 statuslist.fallensurvival = {
     name        = 'Fallen Survival';
     status      = 'Undetected';
-    support     = {'Zenith'; 'Swift'; 'Wave'; 'Potassium__'; 'Volcano'; 'Velocity'}; -- Добавлен Velocity
+    support     = {'Zenith'; 'Swift'; 'Wave'; 'Potassium__'; 'Volcano'; 'Velocity'};
 };
 statuslist.tridentsurvival = {
     name        = 'Trident Survival';
     status      = 'Use at own risk';
-    support     = {'Wave'; 'AWP'; 'MacSploit'; 'Velocity'; 'Potassium'; 'Seliware'; }; -- Velocity уже был здесь
+    support     = {'Wave'; 'AWP'; 'MacSploit'; 'Velocity'; 'Potassium'; 'Seliware'};
 };
 
 local players       = game:GetService('Players');
@@ -40,13 +88,15 @@ if (not localPlayer) then
     localPlayer = players.LocalPlayer;
 end;
 
-local executor      = identifyexecutor and identifyexecutor() or 'Velocity'; -- Устанавливаем по умолчанию Velocity
+-- Предварительная инициализация ChatChannels для предотвращения ошибок
+local chatChannels = getChatChannels()
 
-local messagebox    = messageboxasync or messagebox or function() return 6 end; -- Заглушка, если messagebox отсутствует
-local request       = request or http_request or syn and syn.request or httprequest or fluxus and fluxus.request or function() end; -- Альтернативы для request
+local executor      = identifyexecutor and identifyexecutor() or 'Velocity';
+
+local messagebox    = messageboxasync or messagebox or function() return 6 end;
+local request       = request or http_request or syn and syn.request or httprequest or fluxus and fluxus.request or function() end;
 local loadstring    = loadstring;
 
--- Заглушка для messagebox, если она не существует
 if (type(messagebox) ~= 'function') then
     messagebox = function() return 6 end
 end;
@@ -55,7 +105,7 @@ local protectedMessagebox = function(body, title, id)
     local success, output = pcall(messagebox, body, title, id);
     if (not success) then
         warn('[amongus.hook] messagebox_error - ' .. tostring(body));
-        return 6; -- Возвращаем значение по умолчанию вместо кика
+        return 6;
     end;
     return output;
 end;
@@ -79,12 +129,11 @@ end;
 
 if (type(loadstring) ~= 'function') then
     loadstring = function(code) 
-        return load(code); -- Альтернатива для loadstring
+        return load(code);
     end
 end;
 
 if (type(request) ~= 'function') then
-    -- Используем встроенные функции Roblox, если request недоступен
     request = function(options)
         local success, result = pcall(function()
             return game:HttpGetAsync(options.Url, true)
