@@ -1,15 +1,13 @@
 if not game:IsLoaded() then
     game.Loaded:Wait()
-end;
-
--- Добавляем функцию идентификации для Velocity, если она отсутствует
-if not identifyexecutor then
-    getgenv().identifyexecutor = function() 
-        return "Velocity" 
-    end
 end
 
--- Добавляем table.find, если он отсутствует
+-- Простая функция для идентификации экзекьютора
+getgenv().identifyexecutor = function() 
+    return "Velocity" 
+end
+
+-- Простая функция поиска в таблице
 if not table.find then
     table.find = function(t, value)
         for i, v in pairs(t) do
@@ -21,132 +19,35 @@ if not table.find then
     end
 end
 
+-- Минимальная версия без сложных проверок
 local players = game:GetService('Players')
 local localPlayer = players.LocalPlayer
-if (not localPlayer) then
+if not localPlayer then
     players:GetPropertyChangedSignal('LocalPlayer'):Wait()
     localPlayer = players.LocalPlayer
 end
 
--- Полностью убираем функцию getChatChannels и связанные с ней вызовы
--- Вместо этого создаем простую заглушку для любых обращений к интерфейсу
-
--- Перехватываем любые попытки обращения к несуществующим элементам интерфейса
-local originalIndex = nil
-originalIndex = hookmetamethod(game, "__index", function(self, key)
-    if type(self) == "Instance" and not rawget(self, key) then
-        -- Если обращаются к несуществующему свойству, создаем заглушку
-        if key == "Global" or key == "ChatChannels" or key == "Chat" then
-            local fakeObj = Instance.new("Frame")
-            fakeObj.Name = key
-            fakeObj.Visible = false
-            fakeObj.Parent = self
-            return fakeObj
+-- Упрощенная загрузка без проверок
+local function simpleLoad(url)
+    local success, result = pcall(function()
+        return game:HttpGetAsync(url, true)
+    end)
+    
+    if success and result then
+        local loader = loadstring(result)
+        if loader then
+            return loader()
         end
     end
-    return originalIndex(self, key)
-end)
-
-local statuslist = {};
-statuslist.fallensurvival = {
-    name        = 'Fallen Survival';
-    status      = 'Undetected';
-    support     = {'Zenith'; 'Swift'; 'Wave'; 'Potassium__'; 'Volcano'; 'Velocity'};
-};
-statuslist.tridentsurvival = {
-    name        = 'Trident Survival';
-    status      = 'Use at own risk';
-    support     = {'Wave'; 'AWP'; 'MacSploit'; 'Velocity'; 'Potassium'; 'Seliware'};
-};
-
-local executor = identifyexecutor and identifyexecutor() or 'Velocity';
-
-local messagebox = messageboxasync or messagebox or function() return 6 end;
-local request = request or http_request or (syn and syn.request) or (httprequest) or (fluxus and fluxus.request) or function() end;
-local loadstring = loadstring;
-
-if (type(messagebox) ~= 'function') then
-    messagebox = function() return 6 end
-end;
-
-local protectedMessagebox = function(body, title, id)
-    local success, output = pcall(messagebox, body, title, id);
-    if (not success) then
-        warn('[amongus.hook] messagebox_error - ' .. tostring(body));
-        return 6;
-    end;
-    return output;
-end;
-
-local protectedLoad = function(url)
-    local success, response = pcall(request, {Url=url, Method='GET'});
-    if (not success) then
-        warn('[amongus.hook] protectedLoad failed(1) - request error: ' .. tostring(url));
-        return nil;
-    elseif (type(response) ~= 'table' or type(response.Body) ~= 'string' or response.StatusCode ~= 200) then
-        warn('[amongus.hook] protectedLoad failed(2) - bad response: ' .. tostring(url));
-        return nil;
-    end;
-    local loader = loadstring(response.Body);
-    if (not loader) then
-        warn('[amongus.hook] protectedLoad failed(3) - syntax error: ' .. tostring(url));
-        return nil;
-    end;
-    return loader();
-end;
-
-if (type(loadstring) ~= 'function') then
-    loadstring = function(code) 
-        return load(code);
-    end
-end;
-
-if (type(request) ~= 'function') then
-    request = function(options)
-        local success, result = pcall(function()
-            return game:HttpGetAsync(options.Url, true)
-        end)
-        if success and result then
-            return {StatusCode = 200, Body = result}
-        else
-            return {StatusCode = 404, Body = ""}
-        end
-    end
-end;
-
-local placeid = game.PlaceId;
-local dir = 'https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/';
-
-local load = function(name)
-    local game = statuslist[name];
-    if (game.status ~= 'Undetected') then
-        local result = protectedMessagebox(game.name .. ' is Currently Marked as ' .. game.status .. '!\n\nAre You Sure You Want to Continue?', 'amongus.hook', 52);
-        if result ~= 6 then
-            return;
-        end
-    end;
-    if (game.support and not table.find(game.support, executor)) then
-        local result = protectedMessagebox('Unsupported Executor!\n\n' .. executor .. ' is not Officially Supported for ' .. game.name .. '\nand may have Undefined Behaviour or even result in a BAN!\n\nAre You Sure You Want to Continue?', 'amongus.hook [' .. executor .. ']', 52);
-        if result ~= 6 then
-            return;
-        end
-    end;
-    protectedLoad(dir .. name .. '/main.lua');
-end;
-
--- Безопасная загрузка скриптов
-local function safeLoadGameScript()
-    if (placeid == 13253735473) then
-        load('tridentsurvival');
-    elseif (placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343) then
-        load('fallensurvival');
-    else
-        protectedMessagebox('This Game is Unsupported!\n\nIf you believe this is incorrect, please open a ticket in our discord! - discord.gg/2jycAcKvdw', 'amongus.hook [' .. placeid .. ']', 48);
-    end
+    return nil
 end
 
--- Запускаем с защитой от ошибок
-local success, err = pcall(safeLoadGameScript)
-if not success then
-    warn('[amongus.hook] Script execution error: ' .. tostring(err))
+-- Прямая загрузка нужного скрипта
+local placeid = game.PlaceId
+if placeid == 13253735473 then
+    simpleLoad('https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/tridentsurvival/main.lua')
+elseif placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343 then
+    simpleLoad('https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/fallensurvival/main.lua')
+else
+    warn("Unsupported game: " .. placeid)
 end
