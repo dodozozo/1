@@ -28,33 +28,24 @@ if (not localPlayer) then
     localPlayer = players.LocalPlayer
 end
 
--- Упрощенная функция для ChatChannels без обращения к Name
-local function getChatChannels()
-    -- Просто создаем заглушку без сложных проверок
-    local fakeChannels = Instance.new("Frame")
-    fakeChannels.Name = "ChatChannels"
-    fakeChannels.Visible = false
-    
-    -- Пытаемся найти реальный чат, но не полагаемся на него
-    pcall(function()
-        local playerGui = players.LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            local gameUI = playerGui:FindFirstChild("GameUI")
-            if gameUI then
-                local chat = gameUI:FindFirstChild("Chat")
-                if chat then
-                    fakeChannels.Parent = chat
-                    return
-                end
-            end
-        end
-    end)
-    
-    return fakeChannels
-end
+-- Полностью убираем функцию getChatChannels и связанные с ней вызовы
+-- Вместо этого создаем простую заглушку для любых обращений к интерфейсу
 
--- Инициализируем после полной загрузки localPlayer
-local chatChannels = getChatChannels()
+-- Перехватываем любые попытки обращения к несуществующим элементам интерфейса
+local originalIndex = nil
+originalIndex = hookmetamethod(game, "__index", function(self, key)
+    if type(self) == "Instance" and not rawget(self, key) then
+        -- Если обращаются к несуществующему свойству, создаем заглушку
+        if key == "Global" or key == "ChatChannels" or key == "Chat" then
+            local fakeObj = Instance.new("Frame")
+            fakeObj.Name = key
+            fakeObj.Visible = false
+            fakeObj.Parent = self
+            return fakeObj
+        end
+    end
+    return originalIndex(self, key)
+end)
 
 local statuslist = {};
 statuslist.fallensurvival = {
