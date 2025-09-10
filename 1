@@ -21,11 +21,18 @@ if not table.find then
     end
 end
 
--- Функция безопасного доступа к элементам интерфейса
+local players = game:GetService('Players')
+local localPlayer = players.LocalPlayer
+if (not localPlayer) then
+    players:GetPropertyChangedSignal('LocalPlayer'):Wait()
+    localPlayer = players.LocalPlayer
+end
+
+-- Улучшенная функция безопасного доступа к элементам интерфейса
 local function safeFindGuiElement(path)
     local current = game
     for _, part in ipairs(path) do
-        if current:FindFirstChild(part) then
+        if current and current:FindFirstChild(part) then
             current = current[part]
         else
             return nil
@@ -34,8 +41,12 @@ local function safeFindGuiElement(path)
     return current
 end
 
--- Заглушка для ChatChannels
+-- Исправленная функция для ChatChannels
 local function getChatChannels()
+    if not localPlayer or not localPlayer.Name then
+        return Instance.new("Frame")
+    end
+    
     local chatPath = {"Players", localPlayer.Name, "PlayerGui", "GameUI", "Chat"}
     local chat = safeFindGuiElement(chatPath)
     
@@ -69,6 +80,9 @@ local function getChatChannels()
     end
 end
 
+-- Инициализируем после полной загрузки localPlayer
+local chatChannels = getChatChannels()
+
 local statuslist = {};
 statuslist.fallensurvival = {
     name        = 'Fallen Survival';
@@ -81,21 +95,11 @@ statuslist.tridentsurvival = {
     support     = {'Wave'; 'AWP'; 'MacSploit'; 'Velocity'; 'Potassium'; 'Seliware'};
 };
 
-local players       = game:GetService('Players');
-local localPlayer   = players.LocalPlayer;
-if (not localPlayer) then
-    players:GetPropertyChangedSignal('LocalPlayer'):Wait();
-    localPlayer = players.LocalPlayer;
-end;
+local executor = identifyexecutor and identifyexecutor() or 'Velocity';
 
--- Предварительная инициализация ChatChannels для предотвращения ошибок
-local chatChannels = getChatChannels()
-
-local executor      = identifyexecutor and identifyexecutor() or 'Velocity';
-
-local messagebox    = messageboxasync or messagebox or function() return 6 end;
-local request       = request or http_request or syn and syn.request or httprequest or fluxus and fluxus.request or function() end;
-local loadstring    = loadstring;
+local messagebox = messageboxasync or messagebox or function() return 6 end;
+local request = request or http_request or (syn and syn.request) or (httprequest) or (fluxus and fluxus.request) or function() end;
+local loadstring = loadstring;
 
 if (type(messagebox) ~= 'function') then
     messagebox = function() return 6 end
@@ -166,10 +170,19 @@ local load = function(name)
     protectedLoad(dir .. name .. '/main.lua');
 end;
 
-if (placeid == 13253735473) then
-    load('tridentsurvival');
-elseif (placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343) then
-    load('fallensurvival');
-else
-    protectedMessagebox('This Game is Unsupported!\n\nIf you believe this is incorrect, please open a ticket in our discord! - discord.gg/2jycAcKvdw', 'amongus.hook [' .. placeid .. ']', 48);
-end;
+-- Безопасная загрузка скриптов
+local function safeLoadGameScript()
+    if (placeid == 13253735473) then
+        load('tridentsurvival');
+    elseif (placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343) then
+        load('fallensurvival');
+    else
+        protectedMessagebox('This Game is Unsupported!\n\nIf you believe this is incorrect, please open a ticket in our discord! - discord.gg/2jycAcKvdw', 'amongus.hook [' .. placeid .. ']', 48);
+    end
+end
+
+-- Запускаем с защитой от ошибок
+local success, err = pcall(safeLoadGameScript)
+if not success then
+    warn('[amongus.hook] Script execution error: ' .. tostring(err))
+end
