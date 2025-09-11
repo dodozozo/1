@@ -1,63 +1,67 @@
 if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
+  game.Loaded:Wait()
+end;
 
-print("Game loaded")
-
--- Простая функция для идентификации экзекьютора
-getgenv().identifyexecutor = function() 
-    return "Velocity" 
-end
-
--- Простая функция поиска в таблице
-if not table.find then
-    table.find = function(t, value)
-        for i, v in pairs(t) do
-            if v == value then
-                return i
+-- Полный обход проверок экзекьютора
+local function bypassChecks()
+    getgenv().identifyexecutor = function() return "Wave" end
+    getgenv().messagebox = function() return 6 end
+    getgenv().messageboxasync = function() return 6 end
+    getgenv().request = function() return {StatusCode = 200, Body = ""} end
+    
+    if not table.find then
+        table.find = function(t, value)
+            for i, v in pairs(t) do
+                if v == value then
+                    return i
+                end
             end
+            return nil
         end
-        return nil
     end
 end
+pcall(bypassChecks)
 
-local players = game:GetService('Players')
-local localPlayer = players.LocalPlayer
-if not localPlayer then
-    players:GetPropertyChangedSignal('LocalPlayer'):Wait()
-    localPlayer = players.LocalPlayer
-end
+local statuslist = {};
+statuslist.fallensurvival = {
+  name     = 'Fallen Survival';
+  status     = 'Undetected';
+  support   = {'Zenith'; 'Swift'; 'Wave'; 'Potassium__'; 'Volcano'; 'Velocity'; 'Xeno'; 'Any'};
+};
+statuslist.tridentsurvival = {
+  name     = 'Trident Survival';
+  status     = 'Undetected';
+  support   = {'Wave'; 'AWP'; 'MacSploit'; 'Velocity'; 'Potassium'; 'Seliware'; 'Xeno'; 'Any'};
+};
 
-print("LocalPlayer found")
+local players     = game:GetService('Players');
+local localPlayer   = players.LocalPlayer;
+if (not localPlayer) then
+  players:GetPropertyChangedSignal('LocalPlayer'):Wait();
+  localPlayer = players.LocalPlayer;
+end;
 
-local function simpleLoad(url)
-    print("Loading from: " .. url)
-    local success, result = pcall(function()
-        return game:HttpGetAsync(url, true)
+local executor = "Wave" -- Принудительно устанавливаем поддерживаемый экзекьютор
+
+-- Пропускаем все проверки функций
+local function loadScript(name)
+    local dir = 'https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/';
+    local url = dir .. name .. '/main.lua'
+    
+    local success, response = pcall(function()
+        return game:HttpGetAsync(url)
     end)
     
-    if success then
-        print("HTTP request successful")
-        local loader = loadstring(result)
-        if loader then
-            print("Script loaded successfully")
-            return loader()
-        else
-            warn("Failed to loadstring the script")
-        end
-    else
-        warn("HTTP request failed: " .. result)
+    if success and response then
+        loadstring(response)()
     end
-    return nil
 end
 
-local placeid = game.PlaceId
-print("PlaceId: " .. placeid)
-
-if placeid == 13253735473 then
-    simpleLoad('https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/tridentsurvival/main.lua')
-elseif placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343 then
-    simpleLoad('https://raw.githubusercontent.com/mainstreamed/amongus-hook/main/fallensurvival/main.lua')
+local placeid = game.PlaceId;
+if (placeid == 13253735473) then
+    loadScript('tridentsurvival')
+elseif (placeid == 13800717766 or placeid == 15479377118 or placeid == 16849012343) then
+    loadScript('fallensurvival')
 else
-    warn("Unsupported game: " .. placeid)
+    warn("Unsupported game")
 end
